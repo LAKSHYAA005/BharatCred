@@ -26,12 +26,12 @@ class Transaction(BaseModel):
 
 @app.post("/get-score")
 def calculate_score(txns: List[Transaction]):
-    # A. Pre-Processing
+    # A. PRE-PROCESSING
     df = pd.DataFrame([t.dict() for t in txns])
     df['date'] = pd.to_datetime(df['date'])
     df['month_year'] = df['date'].dt.to_period('M')
     
-    # B. NLP CATEGORIZATION
+    # B. NLP CATEGORIZATION (Feature Extraction)
     freq_map = df['description'].value_counts().to_dict()
 
     def predict_with_confidence(row):
@@ -59,8 +59,7 @@ def calculate_score(txns: List[Transaction]):
     risky_amt = df[df['cat'] == 'Risky']['amount'].abs().sum()
     risky_ratio = risky_amt / net_spend if net_spend > 0 else 0
 
-    # NEW: Cash Blind-Spot Detection
-    # Detects ATM or Cash Withdrawals to calculate transparency ratio
+    # CASH BLIND-SPOT DETECTION
     cash_df = df[df['description'].str.contains('ATM|CASH|WITHDRAWAL', case=False)]
     total_cash_withdrawn = cash_df['amount'].abs().sum()
     cash_ratio = total_cash_withdrawn / total_income if total_income > 0 else 0
@@ -71,8 +70,7 @@ def calculate_score(txns: List[Transaction]):
     if pd_model:
         prob_default = pd_model.predict_proba(ml_features)[0][1]
         
-        # Blind-Spot Penalty: Artificially increase PD if behavior is hidden in cash
-        # If cash_ratio > 30%, we start increasing the risk probability
+        # Blind-Spot Penalty: Increase risk probability if behavior is hidden in cash
         if cash_ratio > 0.3:
             prob_default = min(1.0, prob_default + (cash_ratio * 0.25))
     else:
@@ -85,7 +83,7 @@ def calculate_score(txns: List[Transaction]):
     if avg_monthly_income > 0:
         base_mult = 0.45 + (np.log10(avg_monthly_income) / 11)
         
-        # Stability Bonus: Rewards 0% Risk + Elite Savings + Low Cash Usage
+        # Stability Bonus: Rewards 0% Risk + Elite Savings (40%+) + Transparency
         stability_bonus = 0.06 if (risky_ratio == 0 and savings_rate > 0.4 and cash_ratio < 0.2) else 0
         
         capacity_multiplier = min(base_mult + stability_bonus, 1.1)
@@ -95,16 +93,40 @@ def calculate_score(txns: List[Transaction]):
     final_score = int(raw_ml_score * capacity_multiplier)
     final_score = max(300, min(900, final_score))
 
+    # INSIGHTS LOGIC
+    if risky_ratio > 0.1:
+        primary_driver = "Speculative/Risky Spending Detected"
+    elif cash_ratio > 0.3:
+        primary_driver = "High Cash Usage (Behavioral Blind-Spot)"
+    elif savings_rate < 0.15:
+        primary_driver = "Low Monthly Savings Rate"
+    else:
+        primary_driver = "Consistent Financial Discipline"
+
     return {
         "credit_score": final_score,
-        "ml_pipeline": {
+        "behavioral_insights": {
+            "financial_health_metrics": {
+                "monthly_income_avg": f"₹{round(avg_monthly_income, 2)}",
+                "savings_rate": f"{round(savings_rate * 100)}%",
+                "transparency_index": f"{round((1 - cash_ratio) * 100)}%",
+                "risky_spending_total": f"₹{round(risky_amt, 2)}"
+            },
+            "category_distribution": df['cat'].value_counts().to_dict(),
+            "ai_verdict": {
+                "risk_status": "High" if prob_default > 0.6 else "Moderate" if prob_default > 0.3 else "Low",
+                "primary_impact_factor": primary_driver,
+                "stability_bonus": "Applied" if stability_bonus > 0 else "Not Eligible"
+            }
+        },
+        "ml_engine_diagnostics": {
             "probability_of_default": f"{round(prob_default * 100, 2)}%",
-            "behavioral_transparency": f"{round((1 - cash_ratio) * 100)}%"
+            "nlp_classification_confidence": f"{round(df['conf'].mean() * 100)}%",
+            "capacity_multiplier_used": round(capacity_multiplier, 3)
         },
         "market_analysis": {
             "status": "Excellent" if final_score > 750 else "Good" if final_score > 650 else "High Risk",
-            "discipline_bonus_applied": True if stability_bonus > 0 else False,
-            "cash_usage_alert": "High" if cash_ratio > 0.4 else "Normal"
+            "cash_usage_alert": "High (Action Required)" if cash_ratio > 0.4 else "Normal"
         }
     }
 
