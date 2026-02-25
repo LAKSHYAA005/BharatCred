@@ -105,6 +105,12 @@ def calculate_score(txns: List[Transaction]):
     else:
         primary_driver = "Consistent Financial Discipline"
 
+   # Extracting exact Rupee amounts for category-specific insights
+    # .abs().sum() ensures we get a positive total for debits
+    leisure_amt = df[df['cat'] == 'Leisure']['amount'].abs().sum()
+    investment_amt = df[df['cat'] == 'Investment']['amount'].abs().sum()
+    essential_amt = df[df['cat'] == 'Essential']['amount'].abs().sum()
+
     return {
         "credit_score": final_score,
         "behavioral_insights": {
@@ -112,7 +118,12 @@ def calculate_score(txns: List[Transaction]):
                 "monthly_income_avg": f"₹{round(avg_monthly_income, 2)}",
                 "savings_rate": f"{round(savings_rate * 100)}%",
                 "transparency_index": f"{round((1 - cash_ratio) * 100)}%",
-                "risky_spending_total": f"₹{round(risky_amt, 2)}"
+            },
+            "spending_breakdown_rupees": {
+                "total_investment": f"₹{round(investment_amt, 2)}",
+                "total_risky": f"₹{round(risky_amt, 2)}",
+                "total_leisure": f"₹{round(leisure_amt, 2)}",
+                "total_essential": f"₹{round(essential_amt, 2)}"
             },
             "category_distribution": df['cat'].value_counts().to_dict(),
             "ai_verdict": {
