@@ -5,6 +5,8 @@ import numpy as np
 from pydantic import BaseModel
 from typing import List
 import uvicorn
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 app = FastAPI()
 
@@ -27,7 +29,7 @@ class Transaction(BaseModel):
 @app.post("/get-score")
 def calculate_score(txns: List[Transaction]):
     # A. PRE-PROCESSING
-    df = pd.DataFrame([t.dict() for t in txns])
+    df = pd.DataFrame([t.model_dump() for t in txns])
     df['date'] = pd.to_datetime(df['date'])
     df['month_year'] = df['date'].dt.to_period('M')
     
