@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
+    "@clerk/clerk-react": "^5.61.1",
+    "@clerk/themes": "^2.4.55",
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.1",
     "class-variance-authority": "^0.7.1",
@@ -27,6 +29,7 @@
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",
     "react-resizable-panels": "^4.6.5",
+    "react-router-dom": "^7.13.1",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
