@@ -30,8 +30,14 @@ export const analyzeCreditWithAI = async (mlData) => {
     const { credit_score, behavioral_insights, ml_engine_diagnostics, market_analysis } = mlData;
     const { financial_health_metrics, category_distribution, ai_verdict, spending_breakdown_rupees } = behavioral_insights;
 
+    // Dynamic counts based on score
+    const strengthCount = credit_score >= 750 ? 5 : credit_score >= 650 ? 4 : 2;
+    const weaknessCount = credit_score >= 750 ? 2 : credit_score >= 650 ? 3 : 5;
+    const improvementCount = credit_score >= 750 ? 3 : credit_score >= 650 ? 4 : 5;
+
     const spendingInfo = spending_breakdown_rupees
-        ? `- Investment Spending: ${spending_breakdown_rupees.total_investment}
+        ? `- Total Income: ${spending_breakdown_rupees.total_income}
+- Investment Spending: ${spending_breakdown_rupees.total_investment}
 - Risky Spending: ${spending_breakdown_rupees.total_risky}
 - Leisure Spending: ${spending_breakdown_rupees.total_leisure}
 - Essential Spending: ${spending_breakdown_rupees.total_essential}`
@@ -40,16 +46,16 @@ export const analyzeCreditWithAI = async (mlData) => {
     const prompt = `You are a financial analyst for BharatCred. Analyze the following credit report and respond ONLY with a valid JSON object in this exact format:
 {
   "summary": "A detailed overview of the person's financial health and CIBIL score of ${credit_score} in approximately 150 words.",
-  "strengths": ["strength 1", "strength 2", "strength 3", "strength 4", "strength 5"],
-  "weaknesses": ["weakness 1", "weakness 2", "weakness 3", "weakness 4", "weakness 5"],
-  "improvements": ["actionable tip 1", "actionable tip 2", "actionable tip 3", "actionable tip 4", "actionable tip 5"]
+  "strengths": ["strength 1", ..., "strength ${strengthCount}"],
+  "weaknesses": ["weakness 1", ..., "weakness ${weaknessCount}"],
+  "improvements": ["actionable tip 1", ..., "actionable tip ${improvementCount}"]
 }
 
 Rules:
 - summary: must be approximately 150 words, covering overall financial health, score reasoning, and key observations
-- strengths: 4-5 specific reasons why the score is at its current level (positive factors)
-- weaknesses: 4-5 specific reasons holding the score back or increasing risk
-- improvements: 4-5 concrete, actionable steps the person can take to improve their CIBIL score
+- strengths: provide EXACTLY ${strengthCount} specific reasons why the score is at its current level (positive factors)
+- weaknesses: provide EXACTLY ${weaknessCount} specific reasons holding the score back or increasing risk
+- improvements: provide EXACTLY ${improvementCount} concrete, actionable steps the person can take to improve their CIBIL score
 - Be direct, friendly, and specific to the data provided
 - Return ONLY the JSON, no extra text
 
@@ -87,4 +93,42 @@ ${spendingInfo}
     const content = response.data.choices[0].message.content;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     return JSON.parse(jsonMatch[0]);
+};
+
+export const parsePdfTransactions = async (rawPdfText) => {
+    const prompt = `You are a bank statement parser. Extract all transactions from the following raw text extracted from a PDF bank statement.
+
+Return ONLY a valid JSON array. Each item must have:
+- "description": string (merchant/transaction name)
+- "amount": number (negative for debits/expenses, positive for credits/income)
+- "date": string (in YYYY-MM-DD format if possible, else as-is)
+
+Rules:
+- If the PDF has separate Debit and Credit columns, debits should be negative, credits positive.
+- Skip non-transaction lines (headers, footers, balance lines, opening/closing balance).
+- Return ONLY the JSON array, no explanation.
+
+Raw PDF Text:
+${rawPdfText.slice(0, 12000)}`;
+
+    const response = await axios.post(
+        `${process.env.API_BASE}/chat/completions`,
+        {
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: "You are a bank statement parser. Always respond with a valid JSON array only." },
+                { role: "user", content: prompt },
+            ],
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${process.env.TOKEN}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    const content = response.data.choices[0].message.content;
+    const arrayMatch = content.match(/\[[\s\S]*\]/);
+    return JSON.parse(arrayMatch[0]);
 };

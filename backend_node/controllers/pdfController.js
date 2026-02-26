@@ -1,0 +1,62 @@
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import axios from 'axios';
+import { parsePdfTransactions, analyzeCreditWithAI } from '../services/openaiService.js';
+
+// Resolve worker path from node_modules (import.meta.resolve works in Node 22+)
+pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+
+async function extractTextFromPdf(buffer) {
+    const uint8Array = new Uint8Array(buffer);
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array, useWorkerFetch: false, isEvalSupported: false, disableFontFace: true });
+    const pdf = await loadingTask.promise;
+
+    let fullText = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+    }
+    return fullText;
+}
+
+export const analyzeFromPdf = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No PDF file uploaded.' });
+        }
+
+        // STEP 1: Extract raw text from PDF
+        const rawText = await extractTextFromPdf(req.file.buffer);
+
+        if (!rawText || rawText.trim().length === 0) {
+            return res.status(422).json({ error: 'Could not extract text from PDF. It may be a scanned/image-based PDF.' });
+        }
+
+        // STEP 2: OpenAI parses raw text → [{description, amount, date}]
+        const transactions = await parsePdfTransactions(rawText);
+
+        if (!transactions || transactions.length === 0) {
+            return res.status(422).json({ error: 'No transactions found in the PDF.' });
+        }
+
+        // STEP 3: Send clean transactions to Python ML model (/get-score)
+        const mlResponse = await axios.post('http://127.0.0.1:8000/get-score', transactions);
+        const mlData = mlResponse.data;
+
+        // STEP 4: Generate structured AI summary
+        const aiSummary = await analyzeCreditWithAI(mlData);
+
+        // STEP 5: Return full result to frontend
+        res.json({
+            ...mlData,
+            parsed_transactions: transactions,
+            ai_summary: aiSummary,
+        });
+
+    } catch (error) {
+        console.error('Error in PDF analysis:', error.message);
+        console.error('Response data:', error.response?.data);
+        res.status(500).json({ error: 'PDF analysis failed', details: error.response?.data || error.message });
+    }
+};

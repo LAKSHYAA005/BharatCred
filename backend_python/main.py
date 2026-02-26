@@ -30,14 +30,30 @@ class Transaction(BaseModel):
 def calculate_score(txns: List[Transaction]):
     # A. PRE-PROCESSING
     df = pd.DataFrame([t.model_dump() for t in txns])
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['date'], format='mixed', dayfirst=True, errors='coerce')
     df['month_year'] = df['date'].dt.to_period('M')
     
     # B. NLP CATEGORIZATION (Feature Extraction)
     freq_map = df['description'].value_counts().to_dict()
 
+    INCOME_KEYWORDS = ['salary', 'neft credit', 'credit interest', 'freelance credit', 
+                        'interest credit', 'refund', 'cashback', 'dividend', 'bonus credit']
+    INVESTMENT_KEYWORDS = ['sip', 'elss', 'mutual fund', 'mf ', 'equity sip', 'nps', 
+                           'ppf', 'index fund', 'nifty', 'sensex', 'lic', 'insurance premium',
+                           'health insurance', 'term insurance']
+
     def predict_with_confidence(row):
         if nlp_model is None: return "Essential", 1.0
+        desc_lower = row['description'].lower()
+
+        # Keyword pre-classifier: Income
+        if any(k in desc_lower for k in INCOME_KEYWORDS):
+            return "Income", 1.0
+
+        # Keyword pre-classifier: Investment
+        if any(k in desc_lower for k in INVESTMENT_KEYWORDS):
+            return "Investment", 1.0
+
         features = pd.DataFrame([[row['description'], row['amount'], freq_map[row['description']]]], 
                                 columns=['text', 'amount', 'freq'])
         probs = nlp_model.predict_proba(features)[0] 
@@ -49,16 +65,25 @@ def calculate_score(txns: List[Transaction]):
     df['conf'] = [r[1] for r in results]
     
     # C. BEHAVIORAL FEATURES
-    total_months = df['month_year'].nunique()
-    total_income = df[df['cat'] == 'Income']['amount'].sum()
+    # Only count months that have at least one valid (non-NaT) transaction
+    valid_months = df[df['month_year'].notna()]['month_year'].nunique()
+    total_months = valid_months if valid_months > 0 else 1
+
+    # Income = only positive-amount transactions classified as Income
+    # (guards against GPT sending ambiguous credits that the NLP mislabels)
+    total_income = df[(df['cat'] == 'Income') & (df['amount'] > 0)]['amount'].sum()
     avg_monthly_income = total_income / total_months if total_months > 0 else 0
-    
-    total_debits = df[df['amount'] < 0]['amount'].abs().sum()
-    non_income_credits = df[(df['amount'] > 0) & (df['cat'] != 'Income')]['amount'].sum()
-    net_spend = max(1, total_debits - non_income_credits)
-    
-    savings_rate = (total_income - net_spend) / total_income if total_income > 0 else 0
-    risky_amt = df[df['cat'] == 'Risky']['amount'].abs().sum()
+
+    # Actual spending = Essential + Leisure + Risky (investments are savings, not spending)
+    essential_spend = df[df['cat'] == 'Essential']['amount'].abs().sum()
+    leisure_spend   = df[df['cat'] == 'Leisure']['amount'].abs().sum()
+    risky_spend     = df[df['cat'] == 'Risky']['amount'].abs().sum()
+    net_spend = max(1, essential_spend + leisure_spend + risky_spend)
+
+    # Savings rate = share of income NOT consumed by expenses
+    # (investments count as saved/deployed money, not as spending)
+    savings_rate = max(0.0, (total_income - net_spend) / total_income) if total_income > 0 else 0
+    risky_amt = risky_spend  # already computed above
     risky_ratio = risky_amt / net_spend if net_spend > 0 else 0
 
     # CASH BLIND-SPOT DETECTION
@@ -120,6 +145,7 @@ def calculate_score(txns: List[Transaction]):
                 "transparency_index": f"{round((1 - cash_ratio) * 100)}%",
             },
             "spending_breakdown_rupees": {
+                "total_income": f"₹{round(total_income, 2)}",
                 "total_investment": f"₹{round(investment_amt, 2)}",
                 "total_risky": f"₹{round(risky_amt, 2)}",
                 "total_leisure": f"₹{round(leisure_amt, 2)}",
