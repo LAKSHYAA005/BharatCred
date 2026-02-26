@@ -35,7 +35,20 @@ export const analyzeFromPdf = async (req, res) => {
         }
 
         // STEP 2: OpenAI parses raw text → [{description, amount, date}]
+        console.log('--- RAW PDF TEXT (first 3000 chars) ---');
+        console.log(rawText.slice(0, 3000));
+        console.log('--- END RAW TEXT ---');
+
         const transactions = await parsePdfTransactions(rawText);
+
+        console.log('--- PARSED TRANSACTIONS (first 10) ---');
+        console.log(JSON.stringify(transactions.slice(0, 10), null, 2));
+        console.log(`Total transactions: ${transactions.length}`);
+        const positiveSum = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+        const negativeSum = transactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
+        console.log(`Sum of positive amounts (income): ₹${positiveSum}`);
+        console.log(`Sum of negative amounts (expenses): ₹${negativeSum}`);
+        console.log('--- END TRANSACTIONS ---');
 
         if (!transactions || transactions.length === 0) {
             return res.status(422).json({ error: 'No transactions found in the PDF.' });

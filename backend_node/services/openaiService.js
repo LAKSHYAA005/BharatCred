@@ -96,16 +96,35 @@ ${spendingInfo}
 };
 
 export const parsePdfTransactions = async (rawPdfText) => {
+    // --- Step A: Extract opening balance from raw text ---
+    const obMatch = rawPdfText.match(/Opening Balance[\s\S]*?([\d,]+\.\d{2})/i);
+    const openingBalance = obMatch ? parseFloat(obMatch[1].replace(/,/g, '')) : null;
+
     const prompt = `You are a bank statement parser. Extract all transactions from the following raw text extracted from a PDF bank statement.
 
 Return ONLY a valid JSON array. Each item must have:
-- "description": string (merchant/transaction name)
-- "amount": number (negative for debits/expenses, positive for credits/income)
+- "description": string (the full narration/description)
+- "amount": number (see sign rules below)
+- "balance": number or null (see balance rules below)
 - "date": string (in YYYY-MM-DD format if possible, else as-is)
 
-Rules:
-- If the PDF has separate Debit and Credit columns, debits should be negative, credits positive.
-- Skip non-transaction lines (headers, footers, balance lines, opening/closing balance).
+STEP 1 — CHECK IF THE PDF HAS A BALANCE COLUMN:
+Look at the table headers. Does the table have a "Balance" column?
+
+IF YES (Balance column exists):
+- "amount": always a POSITIVE number (do NOT determine the sign — it will be computed from balance differences)
+- "balance": the running balance AFTER this transaction (always the LAST number on each row)
+
+IF NO (no Balance column — only Debit/Credit or Withdrawal/Deposit):
+- "balance": null for every transaction
+- "amount": a SIGNED number — you MUST determine the sign:
+  • POSITIVE (+) ONLY for: salary, NEFT credits, IMPS received, refunds, cashback, interest credited, dividends
+  • NEGATIVE (-) for EVERYTHING else: UPI payments, bills, SIP, EMI, rent, transfers to people, shopping, fuel, charges, subscriptions, personal name transfers (e.g. "Suraj Sharma", "Asha")
+  • When in doubt, default to NEGATIVE
+
+OTHER RULES:
+- Preserve the FULL description/narration text (include UPI IDs, NEFT references, merchant names).
+- Skip non-transaction lines (headers, footers, opening/closing balance rows, totals, page numbers).
 - Return ONLY the JSON array, no explanation.
 
 Raw PDF Text:
@@ -130,5 +149,34 @@ ${rawPdfText.slice(0, 12000)}`;
 
     const content = response.data.choices[0].message.content;
     const arrayMatch = content.match(/\[[\s\S]*\]/);
-    return JSON.parse(arrayMatch[0]);
+    const rawTxns = JSON.parse(arrayMatch[0]);
+
+    // --- Step B: Determine correct sign using balance differences ---
+    let prevBalance = openingBalance;
+    const hasBalanceData = rawTxns.some(t => t.balance !== undefined && t.balance !== null);
+
+    const correctedTxns = rawTxns.map((txn) => {
+        const currentBalance = txn.balance;
+
+        // Default: keep GPT's original signed amount (don't strip the sign)
+        let amount = txn.amount;
+
+        // If we have valid balance data, override with balance-diff (more accurate)
+        if (hasBalanceData && prevBalance !== null && currentBalance !== undefined && currentBalance !== null) {
+            const diff = currentBalance - prevBalance;
+            amount = parseFloat(diff.toFixed(2));
+        }
+
+        if (hasBalanceData) {
+            prevBalance = currentBalance;
+        }
+
+        return {
+            description: txn.description,
+            amount,
+            date: txn.date,
+        };
+    });
+
+    return correctedTxns;
 };
