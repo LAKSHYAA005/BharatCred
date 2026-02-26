@@ -130,3 +130,52 @@
     touch-action: manipulation;
     }
 }
+
+/* Credit Gauge Needle Animation */
+@keyframes needleBob {
+  0% { 
+    transform: translateX(-50%) rotate(var(--rot)); 
+  }
+  50% { 
+    transform: translateX(-50%) rotate(calc(var(--rot) + 2deg)); 
+  }
+  100% { 
+    transform: translateX(-50%) rotate(var(--rot)); 
+  }
+}
+
+.running-needle {
+  animation: needleBob 3s infinite ease-in-out;
+}
+
+/* Sweeping Needle Animation - continuous left to right */
+@keyframes needleSweep {
+  0% { 
+    transform: translateX(-50%) rotate(-90deg); 
+  }
+  100% { 
+    transform: translateX(-50%) rotate(90deg); 
+  }
+}
+
+.sweeping-needle {
+  animation: needleSweep 4s infinite ease-in-out alternate;
+  animation-delay: 0s;
+}
+
+/* Animated Gauge Fill - fills as pointer moves */
+@keyframes gaugeFill {
+  0% {
+    stroke-dashoffset: 125.66;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animated-gauge-fill {
+  stroke-dasharray: 125.66;
+  stroke-dashoffset: 125.66;
+  animation: gaugeFill 4s infinite ease-in-out alternate;
+  animation-delay: 0s;
+}

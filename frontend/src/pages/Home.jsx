@@ -4,6 +4,8 @@ import { SignedIn, SignedOut, SignInButton, useAuth } from '@clerk/clerk-react'
 import { Button } from '../components/ui/button'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../components/ui/carousel'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion'
+import CreditGauge from '../components/CreditGauge'
+import BharatLoading from '../components/BharatLoading'
 
 const partnerLogos = [
   { name: 'Axis Bank', src: '/banks/axis.png' },
@@ -102,9 +104,13 @@ export default function Home() {
   }, [partnerCarouselApi])
 
   return (
-    <div className="w-full py-8">
-      <section className="flex w-full items-start pt-6">
-        <div className="min-w-0 w-full max-w-5xl space-y-7">
+    <>
+      {/* Full-screen loading animation for bank statement analysis */}
+      {loading && <BharatLoading />}
+
+      <div className="w-full py-8">
+        <section className="flex w-full items-center justify-between pt-6 gap-10">
+        <div className="min-w-0 w-full max-w-4xl space-y-7">
           <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Smart Credit Intelligence</p>
           <h1 className="text-balance max-w-4xl text-5xl font-bold leading-[1.06] sm:text-6xl lg:text-7xl xl:text-8xl">
             Build Your Credit Journey With Confidence
@@ -158,16 +164,14 @@ export default function Home() {
             </section>
           </SignedOut>
 
-          {/* Loading */}
-          {(loading || checkingScore) && (
+          {/* Loading - only show inline loader for checking score */}
+          {checkingScore && (
             <div className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-              {loading
-                ? 'Analysing your bank statement — this may take 15–30 seconds…'
-                : 'Fetching your saved credit report…'}
+              Fetching your saved credit report…
             </div>
           )}
 
@@ -178,6 +182,11 @@ export default function Home() {
             </div>
           )}
 
+        </div>
+
+        {/* Credit Score Gauge - visible on larger screens */}
+        <div className="hidden lg:flex items-center justify-center">
+          <CreditGauge decorative={true} />
         </div>
       </section>
 
@@ -218,20 +227,18 @@ export default function Home() {
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div className="order-1">
             <img
-              src="/logo.png"
+              src="/images-Photoroom.png"
               alt="Credit score insights"
               width="560"
               height="360"
               loading="lazy"
-              className="h-auto w-full rounded-xl object-contain"
+              className="h-auto w-full object-contain"
             />
           </div>
           <div className="order-2 space-y-4">
             <h2 className="text-2xl font-semibold sm:text-3xl">Why Our Credit Score</h2>
             <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Our score view explains what is helping and hurting your profile, so you can focus on the right financial actions.
-              Instead of showing just a number, BharatCred highlights behavior patterns and practical next steps that improve your
-              credit health over time.
+              BharatScore provides a behavioral-first alternative to traditional credit systems. By auditing UPI transactions with NLP, it rewards financial discipline rather than just loan history. It eliminates information asymmetry by identifying cash blind-spots and offers precise risk insights through a Machine Learning-driven Probability of Default. It is a fairer, real-time diagnostic for modern earners.
             </p>
           </div>
         </div>
@@ -240,18 +247,15 @@ export default function Home() {
       <section className="w-full pb-14">
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div className="order-2 space-y-4 md:order-1">
-            <h2 className="text-2xl font-semibold sm:text-3xl">How to Use It</h2>
+            <h2 className="text-2xl font-semibold sm:text-3xl">Is your bank statement telling the whole story?</h2>
             <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Sign in and upload your bank statement.
-              Review your score factors and trend indicators.
-              Follow the suggestions to improve repayment behavior and utilization.
-              Recheck regularly to track progress.
+              Traditional scores ignore the nuances of your daily discipline. BharatScore audits your real-world UPI patterns with NLP to reward the financial integrity others miss. It's a fairer, real-time diagnostic that turns your transaction history into a verified asset.
             </p>
           </div>
           <div className="order-1 md:order-2">
             <img
-              src="/banks/hdfc.png"
-              alt="How to use BharatCred"
+              src="/bank-statement.png"
+              alt="Bank statement analysis"
               width="560"
               height="360"
               loading="lazy"
@@ -272,32 +276,60 @@ export default function Home() {
         <Accordion type="single" collapsible className="space-y-3">
           <AccordionItem value="faq-1" className="rounded-xl border border-border/70 px-4">
             <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
-              How do I upload my bank statement?
+              How does BharatScore differ from my CIBIL score?
             </AccordionTrigger>
             <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
-              Click on Submit Bank Statements and choose your PDF file to begin.
+              Traditional scores like CIBIL primarily track your history with loans and credit cards. BharatScore is a behavioral-first alternative that audits your everyday UPI transactions using NLP to reward financial discipline, even if you have no prior loan history.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="faq-2" className="rounded-xl border border-border/70 px-4">
             <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
-              How can I check my credit score?
+              Is my bank statement data secure?
             </AccordionTrigger>
             <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
-              Use the Check Credit Score button from the home page.
+              Your privacy is our priority. BharatCred uses an automated ML pipeline to extract behavioral patterns without storing your raw transaction descriptions. We analyze financial markers like savings rates and risk ratios rather than personal details.
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="faq-3" className="rounded-xl border border-border/70 px-4">
             <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
-              Do I need to sign in first?
+              What counts as "Risky Spending" in my audit?
             </AccordionTrigger>
             <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
-              Yes, sign in to access all features and save your progress securely.
+              Our engine identifies high-frequency outflows to speculative platforms, such as gambling apps or high-stakes trading, which can spike your Probability of Default (PD) and lower your overall score.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="faq-4" className="rounded-xl border border-border/70 px-4">
+            <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
+              Can I improve my score if I have high cash usage?
+            </AccordionTrigger>
+            <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
+              Yes. High cash usage creates blind spots in your profile. By switching to digital UPI payments, you increase your Transparency Index, which helps the model grant you a higher stability bonus.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="faq-5" className="rounded-xl border border-border/70 px-4">
+            <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
+              Why did my score decrease despite a high income?
+            </AccordionTrigger>
+            <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
+              BharatScore uses logarithmic scaling for income. Having a high salary isn't enough—the model also checks your Savings Rate and Leisure-to-Essential spending ratio to ensure you have a sufficient cushion to repay debts.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="faq-6" className="rounded-xl border border-border/70 px-4">
+            <AccordionTrigger className="py-5 text-base font-semibold hover:no-underline">
+              How often can I re-check my score?
+            </AccordionTrigger>
+            <AccordionContent className="pb-5 text-base leading-relaxed text-muted-foreground">
+              You can refresh your audit whenever you have a new month of transaction data. Regular checks help you track how changes in your spending habits directly impact your market reliability.
             </AccordionContent>
           </AccordionItem>
         </Accordion>
       </section>
     </div>
+    </>
   )
 }
