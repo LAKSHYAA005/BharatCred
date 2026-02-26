@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List
 import uvicorn
 import warnings
+import re
 warnings.filterwarnings("ignore", category=UserWarning)
 
 app = FastAPI()
@@ -30,28 +31,41 @@ class Transaction(BaseModel):
 def calculate_score(txns: List[Transaction]):
     # A. PRE-PROCESSING
     df = pd.DataFrame([t.model_dump() for t in txns])
-    df['date'] = pd.to_datetime(df['date'], format='mixed', dayfirst=True, errors='coerce')
+
+    # Parse ISO dates strictly first (YYYY-MM-DD) to avoid day/month inversion.
+    # Fallback to mixed day-first parsing only for non-ISO strings.
+    raw_dates = df['date'].astype(str).str.strip()
+    iso_mask = raw_dates.str.match(r'^\d{4}-\d{2}-\d{2}$')
+    parsed_dates = pd.Series(pd.NaT, index=df.index, dtype='datetime64[ns]')
+    parsed_dates.loc[iso_mask] = pd.to_datetime(raw_dates.loc[iso_mask], format='%Y-%m-%d', errors='coerce')
+    parsed_dates.loc[~iso_mask] = pd.to_datetime(raw_dates.loc[~iso_mask], format='mixed', dayfirst=True, errors='coerce')
+
+    df['date'] = parsed_dates
     df['month_year'] = df['date'].dt.to_period('M')
     
     # B. NLP CATEGORIZATION (Feature Extraction)
     freq_map = df['description'].value_counts().to_dict()
 
-    INCOME_KEYWORDS = ['salary', 'neft credit', 'credit interest', 'freelance credit', 
-                        'interest credit', 'refund', 'cashback', 'dividend', 'bonus credit']
-    INVESTMENT_KEYWORDS = ['sip', 'elss', 'mutual fund', 'mf ', 'equity sip', 'nps', 
-                           'ppf', 'index fund', 'nifty', 'sensex', 'lic', 'insurance premium',
-                           'health insurance', 'term insurance']
+    INCOME_KEYWORDS = ['salary', 'neftcredit', 'creditinterest', 'freelancecredit', 
+                        'interestcredit', 'refund', 'cashback', 'dividend', 'bonuscredit']
+    INVESTMENT_KEYWORDS = ['sip', 'elss', 'mutualfund', 'mf', 'equitysip', 'nps', 
+                           'ppf', 'indexfund', 'nifty', 'sensex', 'lic', 'insurancepremium',
+                           'healthinsurance', 'terminsurance']
+
+    def normalize_text(value: str) -> str:
+        lower = str(value).lower().strip()
+        return re.sub(r'[^a-z0-9]', '', lower)
 
     def predict_with_confidence(row):
         if nlp_model is None: return "Essential", 1.0
-        desc_lower = row['description'].lower()
+        desc_normalized = normalize_text(row['description'])
 
         # Keyword pre-classifier: Income
-        if any(k in desc_lower for k in INCOME_KEYWORDS):
+        if any(k in desc_normalized for k in INCOME_KEYWORDS):
             return "Income", 1.0
 
         # Keyword pre-classifier: Investment
-        if any(k in desc_lower for k in INVESTMENT_KEYWORDS):
+        if any(k in desc_normalized for k in INVESTMENT_KEYWORDS):
             return "Investment", 1.0
 
         features = pd.DataFrame([[row['description'], row['amount'], freq_map[row['description']]]], 

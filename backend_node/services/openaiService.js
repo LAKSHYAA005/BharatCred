@@ -1,5 +1,44 @@
 import axios from 'axios';
 
+const EXPENSE_KEYWORDS = [
+    'sip', 'equitysip', 'elss', 'emi', 'rent', 'bill', 'shopping', 'fuel', 'petrol',
+    'restaurant', 'zomato', 'membership', 'insurance', 'pharmacy', 'electricity',
+    'internet', 'transfer', 'payment', 'charge', 'subscription', 'gym'
+];
+
+const INCOME_KEYWORDS = [
+    'salary', 'neftcredit', 'impsreceived', 'refund', 'cashback', 'interestcredited',
+    'dividend', 'bonus'
+];
+
+function normalizeDescription(description = '') {
+    const lower = String(description).toLowerCase();
+    const compact = lower.replace(/\s+/g, ' ').trim();
+    const noSpace = compact.replace(/[^a-z0-9]/g, '');
+    return { compact, noSpace };
+}
+
+function enforceTransactionSign(description, amount) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) {
+        return 0;
+    }
+
+    const { compact, noSpace } = normalizeDescription(description);
+    const isExpense = EXPENSE_KEYWORDS.some((keyword) => compact.includes(keyword) || noSpace.includes(keyword));
+    const isIncome = INCOME_KEYWORDS.some((keyword) => compact.includes(keyword) || noSpace.includes(keyword));
+
+    if (isExpense && !isIncome) {
+        return -Math.abs(numericAmount);
+    }
+
+    if (isIncome && !isExpense) {
+        return Math.abs(numericAmount);
+    }
+
+    return numericAmount;
+}
+
 const SYSTEM_PROMPT = `You are a helpful financial assistant for BharatCred. 
 You help users understand their credit score, loan eligibility, and financial health.
 Always respond in a clear, concise, and friendly manner.`;
@@ -134,6 +173,7 @@ ${rawPdfText.slice(0, 12000)}`;
         `${process.env.API_BASE}/chat/completions`,
         {
             model: "gpt-4o-mini",
+            temperature: 0,
             messages: [
                 { role: "system", content: "You are a bank statement parser. Always respond with a valid JSON array only." },
                 { role: "user", content: prompt },
@@ -169,6 +209,10 @@ ${rawPdfText.slice(0, 12000)}`;
 
         if (hasBalanceData) {
             prevBalance = currentBalance;
+        }
+
+        if (!hasBalanceData) {
+            amount = enforceTransactionSign(txn.description, amount);
         }
 
         return {
