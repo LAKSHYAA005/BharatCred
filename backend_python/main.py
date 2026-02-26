@@ -116,6 +116,7 @@ def calculate_score(txns: List[Transaction]):
         capacity_multiplier = min(base_mult + stability_bonus, 1.1)
     else:
         capacity_multiplier = 0.45
+        stability_bonus = 0
     
     final_score = int(raw_ml_score * capacity_multiplier)
     final_score = max(300, min(900, final_score))

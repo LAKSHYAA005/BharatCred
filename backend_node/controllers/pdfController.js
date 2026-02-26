@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import axios from 'axios';
 import { parsePdfTransactions, analyzeCreditWithAI } from '../services/openaiService.js';
+import CreditReport from '../models/CreditReport.js';
 
 // Resolve worker path from node_modules (import.meta.resolve works in Node 22+)
 pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
@@ -48,11 +49,28 @@ export const analyzeFromPdf = async (req, res) => {
         const aiSummary = await analyzeCreditWithAI(mlData);
 
         // STEP 5: Return full result to frontend
-        res.json({
+        const result = {
             ...mlData,
             parsed_transactions: transactions,
             ai_summary: aiSummary,
-        });
+        };
+
+        // STEP 6: Save to MongoDB if userId is provided
+        const userId = req.headers['x-clerk-user-id'];
+        if (userId) {
+            try {
+                await CreditReport.findOneAndUpdate(
+                    { userId },
+                    { userId, ...result },
+                    { upsert: true, returnDocument: 'after' }
+                );
+                console.log('Credit report saved for user:', userId);
+            } catch (dbErr) {
+                console.error('Failed to save credit report:', dbErr.message);
+            }
+        }
+
+        res.json(result);
 
     } catch (error) {
         console.error('Error in PDF analysis:', error.message);

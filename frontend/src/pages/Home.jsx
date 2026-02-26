@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignInButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, useAuth } from '@clerk/clerk-react'
 import { Button } from '../components/ui/button'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../components/ui/carousel'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion'
@@ -19,11 +19,40 @@ export default function Home() {
   const bankStatementInputRef = useRef(null)
   const [partnerCarouselApi, setPartnerCarouselApi] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [checkingScore, setCheckingScore] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+  const { userId } = useAuth()
 
   const openBankStatementPicker = () => {
     bankStatementInputRef.current?.click()
+  }
+
+  const handleCheckCreditScore = async () => {
+    if (!userId) return
+    setCheckingScore(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/reports/${userId}`)
+
+      if (response.status === 404) {
+        setError('No credit report found. Please submit a bank statement first.')
+        return
+      }
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to fetch credit report')
+      }
+
+      const data = await response.json()
+      navigate('/results', { state: { result: data } })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCheckingScore(false)
+    }
   }
 
   const handleBankStatementSubmit = async (event) => {
@@ -40,6 +69,7 @@ export default function Home() {
       const response = await fetch('/api/analyze-pdf', {
         method: 'POST',
         body: formData,
+        headers: userId ? { 'x-clerk-user-id': userId } : {},
       })
 
       if (!response.ok) {
@@ -107,8 +137,10 @@ export default function Home() {
               <Button
                 type="button"
                 className="h-12 w-full rounded-xl px-4 text-sm font-semibold sm:w-56"
+                onClick={handleCheckCreditScore}
+                disabled={checkingScore}
               >
-                Check Credit Score
+                {checkingScore ? 'Loading…' : 'Check Credit Score'}
               </Button>
             </section>
           </SignedIn>
@@ -127,13 +159,15 @@ export default function Home() {
           </SignedOut>
 
           {/* Loading */}
-          {loading && (
+          {(loading || checkingScore) && (
             <div className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-              Analysing your bank statement — this may take 15–30 seconds…
+              {loading
+                ? 'Analysing your bank statement — this may take 15–30 seconds…'
+                : 'Fetching your saved credit report…'}
             </div>
           )}
 
