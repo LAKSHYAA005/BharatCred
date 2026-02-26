@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton } from '@clerk/clerk-react'
 import { Button } from '../components/ui/button'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../components/ui/carousel'
@@ -17,15 +18,42 @@ const partnerLogos = [
 export default function Home() {
   const bankStatementInputRef = useRef(null)
   const [partnerCarouselApi, setPartnerCarouselApi] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const navigate = useNavigate()
 
   const openBankStatementPicker = () => {
     bankStatementInputRef.current?.click()
   }
 
-  const handleBankStatementSubmit = (event) => {
+  const handleBankStatementSubmit = async (event) => {
     const selectedFile = event.target.files?.[0]
-    if (!selectedFile) {
-      return
+    if (!selectedFile) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const response = await fetch('/api/analyze-pdf', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Analysis failed')
+      }
+
+      const data = await response.json()
+      navigate('/results', { state: { result: data } })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      event.target.value = ''
     }
   }
 
@@ -97,6 +125,25 @@ export default function Home() {
               </SignInButton>
             </section>
           </SignedOut>
+
+          {/* Loading */}
+          {loading && (
+            <div className="mt-6 flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Analysing your bank statement — this may take 15–30 seconds…
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/10 px-5 py-4 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
         </div>
       </section>
 
