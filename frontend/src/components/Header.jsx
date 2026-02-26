@@ -4,20 +4,20 @@ import { SignInButton, SignUpButton, UserButton, SignedIn, SignedOut } from '@cl
 
 const Header = () => {
 	return (
-		<header className="border-b border-white/10">
-			<nav className="flex w-full items-center justify-between px-6 py-4 md:px-10 lg:px-14">
-				<Link to="/" className="flex items-center gap-3">
-					<img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" />
-					<span className="text-lg font-semibold tracking-wide text-white">BHARATCRED</span>
+		<header className="sticky top-0 z-40 border-b border-border/60 bg-background/95 backdrop-blur">
+			<nav aria-label="Main navigation" className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+				<Link to="/" className="flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					<img src="/logo.png" alt="BharatCred logo" width="48" height="48" fetchPriority="high" className="h-12 w-12 object-contain" />
+					<span className="text-lg font-semibold tracking-wide text-foreground">BHARATCRED</span>
 				</Link>
 
 				<div className="flex items-center gap-3">
 					<SignedOut>
 						<SignInButton mode="modal">
-							<Button variant="outline" className="px-6 text-white hover:bg-white/10">Sign In</Button>
+							<Button variant="outline" className="px-6">Sign In</Button>
 						</SignInButton>
 						<SignUpButton mode="modal">
-							<Button variant="outline" className="px-6 text-white hover:bg-white/10">Sign Up</Button>
+							<Button className="px-6">Sign Up</Button>
 						</SignUpButton>
 					</SignedOut>
 
