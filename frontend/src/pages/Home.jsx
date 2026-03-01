@@ -36,7 +36,7 @@ export default function Home() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/reports/${userId}`)
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/${userId}`)
 
       if (response.status === 404) {
         setError('No credit report found. Please submit a bank statement first.')
@@ -68,7 +68,7 @@ export default function Home() {
       const formData = new FormData()
       formData.append('file', selectedFile)
 
-      const response = await fetch('/api/analyze-pdf', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/analyze-pdf`, {
         method: 'POST',
         body: formData,
         headers: userId ? { 'x-clerk-user-id': userId } : {},
