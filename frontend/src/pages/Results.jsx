@@ -1,6 +1,8 @@
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '../components/ui/button'
-import CreditGauge from '../components/CreditGauge'
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Button } from '../components/ui/button';
+import CreditGauge from '../components/CreditGauge';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Sector } from 'recharts';
 
 function MetricCard({ label, value, sub }) {
   return (
@@ -20,6 +22,34 @@ function Section({ title, children }) {
     </div>
   )
 }
+
+// Helper function to convert currency string to number
+function parseCurrency(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return 0;
+  // Remove currency symbols, commas, and parse as a float
+  return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
+}
+
+const ActiveShape = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+
+  return (
+    <g>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 10} // Makes the slice pop out
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        stroke="#1a1a1a"
+        strokeWidth={1}
+      />
+    </g>
+  );
+};
 
 export default function Results() {
   const { state } = useLocation()
@@ -43,6 +73,48 @@ export default function Results() {
   const diag = result.ml_engine_diagnostics ?? {}
   const market = result.market_analysis ?? {}
   const ai = result.ai_summary ?? null
+
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  const onPieEnter = (_, index) => {
+    setActiveIndex(index);
+  };
+
+  const onPieLeave = () => {
+    setActiveIndex(null);
+  };
+
+  const pieData = [
+    { name: 'Essential', value: parseCurrency(breakdown.total_essential) },
+    { name: 'Investments', value: parseCurrency(breakdown.total_investment) },
+    { name: 'Leisure', value: parseCurrency(breakdown.total_leisure) },
+    { name: 'Risky', value: parseCurrency(breakdown.total_risky) },
+  ].filter(item => item.value > 0);
+
+  const COLORS = ['#3366CC', '#A72C0F', '#00943e', '#FF9900'];
+
+  const renderLegend = (props) => {
+    const { payload } = props;
+    const total = pieData.reduce((sum, entry) => sum + entry.value, 0);
+
+    return (
+      <ul className="space-y-3 text-sm">
+        {payload.map((entry, index) => {
+          const { value, color } = entry;
+          const originalData = pieData.find(d => d.name === value);
+          const percentage = total > 0 ? ((originalData.value / total) * 100).toFixed(0) : 0;
+
+          return (
+            <li key={`item-${index}`} className="flex items-center">
+              <div style={{ width: '12px', height: '12px', backgroundColor: color, marginRight: '10px', borderRadius: '2px' }}></div>
+              <span className="text-muted-foreground mr-2">{value}:</span>
+              <span className="font-semibold">{percentage}%</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
 
   const score = result.credit_score ?? 0
   const scoreColor =
@@ -114,12 +186,44 @@ export default function Results() {
 
       {/* Spending Breakdown */}
       <Section title="Spending Breakdown">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <MetricCard label="Total Income" value={breakdown.total_income} />
-          <MetricCard label="Essential Spend" value={breakdown.total_essential} />
-          <MetricCard label="Investments" value={breakdown.total_investment} />
-          <MetricCard label="Leisure Spend" value={breakdown.total_leisure} />
-          <MetricCard label="Risky Spend" value={breakdown.total_risky} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div className="space-y-4">
+            <MetricCard label="Total Income" value={breakdown.total_income} />
+            <MetricCard label="Essential Spend" value={breakdown.total_essential} />
+            <MetricCard label="Investments" value={breakdown.total_investment} />
+            <MetricCard label="Leisure Spend" value={breakdown.total_leisure} />
+            <MetricCard label="Risky Spend" value={breakdown.total_risky} />
+          </div>
+          <div className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  activeIndex={activeIndex}
+                  activeShape={ActiveShape}
+                  data={pieData}
+                  cx="40%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={140}
+                  padAngle={5}
+                  dataKey="value"
+                  onMouseEnter={onPieEnter}
+                  onMouseLeave={onPieLeave}
+                  transitionDuration={1000}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                  ))}
+                </Pie>
+                <Legend 
+                  content={renderLegend} 
+                  layout="vertical" 
+                  verticalAlign="middle" 
+                  align="right" 
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </Section>
 
