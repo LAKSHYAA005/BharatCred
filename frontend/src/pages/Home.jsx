@@ -227,7 +227,7 @@ export default function Home() {
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div className="order-1">
             <img
-              src="/images-Photoroom.png"
+              src="/images.png"
               alt="Credit score insights"
               width="560"
               height="360"
