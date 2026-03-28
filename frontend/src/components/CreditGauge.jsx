@@ -51,13 +51,15 @@ const CreditGauge = ({ score = 300, showScore = true, decorative = false }) => {
 
   const pathClassName = decorative ? 'animated-gauge-fill' : '';
 
+  // 1. CHANGED: Removed translateX(-50%) to fix the rotation pivot synchronization
   const needleStyle = decorative ? undefined : {
-    transform: `translateX(-50%) rotate(${rotation}deg)`
+    transform: `rotate(${rotation}deg)`
   };
 
+  // 2. CHANGED: Adjusted bottom for perfect vertical alignment with the center dot, moved down by 2mm
   const needleClass = decorative 
-    ? 'absolute bottom-0 left-1/2 w-1.5 h-36 bg-white origin-bottom -translate-x-1/2 shadow-[0_0_20px_rgba(255,255,255,0.8)] z-10 sweeping-needle'
-    : 'absolute bottom-0 left-1/2 w-1.5 h-36 bg-white origin-bottom -translate-x-1/2 shadow-[0_0_20px_rgba(255,255,255,0.8)] z-10 transition-transform duration-100 ease-out';
+    ? 'absolute bottom-[calc(0.5rem-2mm)] left-1/2 w-1.5 h-34 origin-bottom -translate-x-1/2 sweeping-needle z-10 bg-white shadow-[0_0_20px_rgba(255,255,255,0.8)]'
+    : 'absolute bottom-[calc(0.8rem-4mm)] left-1/2 w-1.5 h-34 origin-bottom -translate-x-1/2 transition-transform duration-100 ease-out z-10 bg-white shadow-[0_0_20px_rgba(255,255,255,0.8)]';
 
   return (
     <div className="flex flex-col items-center justify-center">
@@ -93,10 +95,10 @@ const CreditGauge = ({ score = 300, showScore = true, decorative = false }) => {
           className={needleClass}
           style={needleStyle}
         >
-          <div className="w-4 h-4 bg-white rounded-full -translate-x-[5px] mt-[135px] shadow-[0_0_12px_rgba(255,255,255,1)]" />
         </div>
 
-        <div className="absolute bottom-0 left-1/2 w-3 h-3 bg-white rounded-full -translate-x-1/2 shadow-[0_0_10px_rgba(255,255,255,0.8)] z-20" />
+        {/* 3. CHANGED: Replaced the two misaligned circles with a single perfectly centered circle */}
+        <div className="absolute bottom-[-6mm] left-1/2 w-6 h-6 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] z-20" />
       </div>
       
       {!decorative && showScore && (
